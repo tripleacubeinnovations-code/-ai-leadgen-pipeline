@@ -1,0 +1,43 @@
+{
+  "name": "ai-leadgen-pipeline",
+  "version": "1.0.0",
+  "description": "AI-powered lead generation automation pipeline — discover businesses without websites, generate demo sites, deploy, and run cold email outreach.",
+  "type": "module",
+  "main": "src/cli.js",
+  "bin": {
+    "leadgen": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "pipeline": "node src/cli.js run",
+    "find-leads": "node src/cli.js find-leads",
+    "generate-site": "node src/cli.js generate-site",
+    "deploy-sites": "node src/cli.js deploy-sites",
+    "send-emails": "node src/cli.js send-emails",
+    "follow-up": "node src/cli.js follow-up",
+    "check-config": "node src/cli.js check-config"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "form-data": "^4.0.0",
+    "googleapis": "^140.0.1",
+    "mailgun.js": "^10.2.3",
+    "node-cron": "^3.0.3",
+    "openai": "^4.56.0",
+    "ora": "^8.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "lead-generation",
+    "cold-email",
+    "automation",
+    "ai",
+    "pipeline"
+  ],
+  "license": "UNLICENSED",
+  "private": true
+}

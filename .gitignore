@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Credentials
+credentials/
+
+# Generated output
+generated-sites/
+data/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
