@@ -22,7 +22,7 @@ function env(key, defaultValue = undefined) {
 const config = Object.freeze({
   // Gemini AI (Free from Google AI Studio)
   geminiApiKey: env('GEMINI_API_KEY'),
-  geminiModel: env('GEMINI_MODEL', 'gemini-2.0-flash'),
+  geminiModel: env('GEMINI_MODEL', 'gemini-flash-latest'),
 
   // Email (Resend API or Gmail SMTP)
   resendApiKey: env('RESEND_API_KEY'),

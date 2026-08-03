@@ -1,7 +1,7 @@
 /**
- * Email Generator Module (100% FREE - Google Gemini API)
- * -----------------------------------------------------
- * Uses Google Gemini API to generate personalized cold emails and follow-ups.
+ * Email Generator Module (100% FREE - Google Gemini REST API)
+ * -----------------------------------------------------------
+ * Uses Google Gemini API via fast direct fetch to generate personalized cold emails.
  *
  * REQUIRES NO CREDIT CARD! Free from https://aistudio.google.com/app/apikey
  *
@@ -9,18 +9,7 @@
  *   generateEmail(lead, demoUrl, type) → { subject, textBody, htmlBody }
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import config, { requireConfig } from '../config.js';
-
-let genAI = null;
-
-function getGeminiModel() {
-  if (!genAI) {
-    requireConfig();
-    genAI = new GoogleGenerativeAI(config.geminiApiKey);
-  }
-  return genAI.getGenerativeModel({ model: config.geminiModel });
-}
 
 const SYSTEM_PROMPT = `You are a warm, genuine cold email copywriter. Write a 3-5 sentence personalized outreach email.
 
@@ -43,7 +32,7 @@ function buildPrompt(lead, demoUrl, type) {
 }
 
 /**
- * Generate personalized email using Gemini API.
+ * Generate personalized email using Gemini REST API.
  *
  * @param {object} lead
  * @param {string} demoUrl
@@ -51,15 +40,28 @@ function buildPrompt(lead, demoUrl, type) {
  * @returns {Promise<{ subject: string, textBody: string, htmlBody: string }>}
  */
 export async function generateEmail(lead, demoUrl, type = 'initial') {
-  const model = getGeminiModel();
+  requireConfig();
 
   console.log(`✉️  Generating ${type} email via Gemini AI for: ${lead.name}`);
 
   const prompt = `${SYSTEM_PROMPT}\n\n${buildPrompt(lead, demoUrl, type)}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${config.geminiModel}:generateContent?key=${config.geminiApiKey}`;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  let text = response.text().trim();
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  let text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
   // Strip markdown code fences if present
   text = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -72,7 +74,6 @@ export async function generateEmail(lead, demoUrl, type = 'initial') {
     if (jsonMatch) {
       emailData = JSON.parse(jsonMatch[0]);
     } else {
-      // Fallback object if raw text returned
       emailData = {
         subject: `Free Demo Website for ${lead.name}`,
         textBody: `Hi ${lead.name},\n\nWe built a free demo website for your business in ${lead.city}: ${demoUrl}\n\nWould you like to take a look?`,
