@@ -15,7 +15,8 @@
     "deploy-sites": "node src/cli.js deploy-sites",
     "send-emails": "node src/cli.js send-emails",
     "follow-up": "node src/cli.js follow-up",
-    "check-config": "node src/cli.js check-config"
+    "check-config": "node src/cli.js check-config",
+    "dashboard": "node src/server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",

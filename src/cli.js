@@ -319,6 +319,20 @@ program
     process.exit(valid ? 0 : 1);
   });
 
+// ── Dashboard Web UI ──────────────────────────────────────────────
+
+program
+  .command('dashboard')
+  .description('Start the web-based interactive Dashboard (http://localhost:3000)')
+  .option('-p, --port <number>', 'Port to run dashboard server on', '3000')
+  .action((opts) => {
+    showBanner();
+    const port = parseInt(opts.port, 10);
+    import('./server.js').then(module => {
+      module.startServer(port);
+    });
+  });
+
 program.parse(process.argv);
 
 if (!process.argv.slice(2).length) {
