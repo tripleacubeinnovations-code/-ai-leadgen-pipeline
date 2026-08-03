@@ -319,6 +319,54 @@ program
     process.exit(valid ? 0 : 1);
   });
 
+// ── Add Manual Lead ──────────────────────────────────────────────
+
+program
+  .command('add-lead')
+  .description('Manually add and process a custom business lead')
+  .requiredOption('-n, --name <string>', 'Business Name (e.g. "Royal Bakers")')
+  .requiredOption('-c, --category <string>', 'Category/Industry (e.g. "Bakery")')
+  .requiredOption('-l, --city <string>', 'City/Location (e.g. "Mumbai")')
+  .option('-a, --address <string>', 'Full Address')
+  .option('-p, --phone <string>', 'Contact Phone')
+  .option('-e, --email <string>', 'Recipient Email')
+  .option('--dry-run', 'Preview without sending email')
+  .action(async (opts) => {
+    showBanner();
+    if (opts.dryRun) process.env.DRY_RUN = 'true';
+
+    try {
+      const slug = opts.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const customLead = {
+        id: `manual-${Date.now()}`,
+        name: opts.name,
+        category: opts.category,
+        city: opts.city,
+        address: opts.address || `${opts.city}, Local Business Area`,
+        phone: opts.phone || '',
+        email: opts.email || '',
+        slug,
+        hasWebsite: false,
+        websiteUri: null,
+        mapsUrl: `https://maps.google.com/?q=${encodeURIComponent(opts.name + ' ' + opts.city)}`,
+      };
+
+      const { processLead } = await import('./pipeline.js');
+      const result = await processLead(customLead, {
+        recipientEmail: opts.email,
+        dryRun: opts.dryRun,
+      });
+
+      console.log(chalk.green(`\n✅ Custom lead processed successfully!\n`));
+      console.log(`  Business: ${opts.name}`);
+      console.log(`  Demo Site: ${result.demoUrl || 'Generated'}\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(chalk.red(`\n❌ Error: ${err.message}\n`));
+      process.exit(1);
+    }
+  });
+
 // ── Dashboard Web UI ──────────────────────────────────────────────
 
 program

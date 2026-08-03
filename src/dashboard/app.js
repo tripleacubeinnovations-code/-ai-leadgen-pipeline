@@ -226,10 +226,58 @@ function setupEventListeners() {
     }
   });
 
-  // Modals Close
-  document.getElementById('btnCloseSiteModal').addEventListener('click', () => {
-    document.getElementById('siteModal').style.display = 'none';
-    document.getElementById('siteIframe').src = 'about:blank';
+  // Manual Lead Modal Open / Close
+  document.getElementById('btnOpenManualModal').addEventListener('click', () => {
+    document.getElementById('manualModal').style.display = 'flex';
+  });
+
+  document.getElementById('btnCloseManualModal').addEventListener('click', () => {
+    document.getElementById('manualModal').style.display = 'none';
+  });
+
+  // Manual Lead Form Submit
+  document.getElementById('manualLeadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      name: document.getElementById('manualName').value,
+      category: document.getElementById('manualCategory').value,
+      city: document.getElementById('manualCity').value,
+      address: document.getElementById('manualAddress').value,
+      phone: document.getElementById('manualPhone').value,
+      email: document.getElementById('manualEmail').value,
+      dryRun: document.getElementById('manualDryRun').checked,
+    };
+
+    const submitBtn = document.getElementById('btnSubmitManual');
+
+    try {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing Custom Lead with Gemini AI...';
+
+      const res = await fetch('/api/leads/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+      } else {
+        const data = await res.json();
+        alert(`✅ Custom lead processed successfully!\n\nBusiness: ${payload.name}\nDemo Site: ${data.demoUrl || 'Generated'}`);
+        document.getElementById('manualModal').style.display = 'none';
+        document.getElementById('manualLeadForm').reset();
+        fetchStats();
+        fetchLeads();
+      }
+    } catch (err) {
+      alert(`Failed to process manual lead: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🚀 Process Custom Lead Now';
+    }
   });
 
   document.getElementById('btnCloseEmailModal').addEventListener('click', () => {

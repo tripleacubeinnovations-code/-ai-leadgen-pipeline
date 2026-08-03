@@ -242,7 +242,57 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (pathname.startsWith('/api/emails/') && req.method === 'GET') {
+  if (pathname === '/api/leads/manual' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const name = payload.name;
+        const category = payload.category || 'Business';
+        const city = payload.city || 'Local Area';
+        const address = payload.address || `${city}, Local Business Area`;
+        const phone = payload.phone || '';
+        const email = payload.email || '';
+        const dryRun = payload.dryRun === true;
+
+        if (!name) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Business name is required' }));
+          return;
+        }
+
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+        const customLead = {
+          id: `manual-${Date.now()}`,
+          name,
+          category,
+          city,
+          address,
+          phone,
+          email,
+          slug,
+          hasWebsite: false,
+          websiteUri: null,
+          mapsUrl: `https://maps.google.com/?q=${encodeURIComponent(name + ' ' + city)}`,
+        };
+
+        const { processLead } = await import('./pipeline.js');
+        const result = await processLead(customLead, {
+          recipientEmail: email,
+          dryRun,
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
     const slug = pathname.replace('/api/emails/', '');
     const emailFile = path.join(config.dataDir, 'emails', `${slug}-email.json`);
 
