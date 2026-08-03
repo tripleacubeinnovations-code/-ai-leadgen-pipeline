@@ -227,9 +227,13 @@ function setupEventListeners() {
   });
 
   // Manual Lead Modal Open / Close
-  document.getElementById('btnOpenManualModal').addEventListener('click', () => {
+  const openManualModal = () => {
     document.getElementById('manualModal').style.display = 'flex';
-  });
+  };
+
+  document.getElementById('btnOpenManualModal').addEventListener('click', openManualModal);
+  const btn2 = document.getElementById('btnOpenManualModal2');
+  if (btn2) btn2.addEventListener('click', openManualModal);
 
   document.getElementById('btnCloseManualModal').addEventListener('click', () => {
     document.getElementById('manualModal').style.display = 'none';
