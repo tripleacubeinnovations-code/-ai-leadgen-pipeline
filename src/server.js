@@ -293,6 +293,8 @@ async function handleRequest(req, res) {
     });
     return;
   }
+
+  if (pathname.startsWith('/api/emails/') && req.method === 'GET') {
     const slug = pathname.replace('/api/emails/', '');
     const emailFile = path.join(config.dataDir, 'emails', `${slug}-email.json`);
 
