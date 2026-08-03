@@ -1,102 +1,77 @@
 /**
- * Site Generator Module
- * ---------------------
- * Uses the OpenAI API to generate a beautiful, single-file HTML/CSS website
- * for each lead, tailored to their business name, category, and city.
+ * Site Generator Module (100% FREE - Google Gemini API)
+ * ---------------------------------------------------
+ * Uses Google Gemini (via @google/generative-ai) to generate a single-file HTML/CSS website
+ * for each lead.
+ *
+ * REQUIRES NO CREDIT CARD! Free from https://aistudio.google.com/app/apikey
  *
  * Exports:
- *   generateSite(lead) → { html, filePath }
+ *   generateSite(lead) → { html, filePath, fileName }
  */
 
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import config, { requireConfig } from '../config.js';
 
-let openaiClient = null;
+let genAI = null;
 
-function getClient() {
-  if (!openaiClient) {
-    requireConfig('OpenAI API');
-    openaiClient = new OpenAI({ apiKey: config.openaiApiKey });
+function getGeminiModel() {
+  if (!genAI) {
+    requireConfig();
+    genAI = new GoogleGenerativeAI(config.geminiApiKey);
   }
-  return openaiClient;
+  return genAI.getGenerativeModel({ model: config.geminiModel });
 }
 
-// ---------------------------------------------------------------------------
-// Prompt Engineering
-// ---------------------------------------------------------------------------
-
-const SYSTEM_PROMPT = `You are an elite web designer and frontend developer. Your task is to create a single-file HTML page (with all CSS embedded in a <style> tag) for a local business.
+const SYSTEM_PROMPT = `You are an elite web designer and frontend developer. Create a single-file HTML page (with all CSS embedded in a <style> tag) for a local business.
 
 STRICT RULES:
-1. Output ONLY the raw HTML code. No markdown, no explanations, no code fences.
-2. The first character of your response must be "<!DOCTYPE html>" or "<html".
-3. The page MUST be mobile-responsive.
-4. Use modern CSS — gradients, box-shadows, smooth transitions, Google Fonts (link in <head>).
-5. Choose colors, fonts, and imagery style appropriate to the business's industry.
-6. Include ONLY these sections:
-   - HERO: Large heading with business name, a compelling tagline for their industry, and a CTA button ("Contact Us" or "Get a Quote").
-   - ABOUT: 2-3 paragraphs about the business — write realistic, professional copy as if you were the business owner. Mention the city/area they serve.
-   - CONTACT: Display phone number (if provided), address, and a simple contact form (name, email, message fields + submit button). The form action can be "#".
-   - FOOTER: Business name, copyright year, small tagline.
-7. Add subtle animations: fade-in on scroll, hover effects on buttons, smooth scroll behavior.
-8. Use semantic HTML5 elements (header, main, section, footer).
-9. The page should look like a REAL professional business website, not a template.
-10. Include a <title> and <meta description> appropriate for the business.`;
+1. Output ONLY raw HTML code. Do NOT wrap in markdown code blocks like \`\`\`html.
+2. First character MUST be "<!DOCTYPE html>" or "<html".
+3. Mobile responsive, modern CSS, gradients, card shadows, Google Fonts link in <head>.
+4. Industry-tailored color palette and typography.
+5. Mandatory Sections:
+   - HERO: Business Name, industry tagline, CTA button ("Get a Free Quote" / "Book Appointment").
+   - ABOUT: 2-3 realistic, professional paragraphs tailored to their city/area.
+   - CONTACT: Phone number, Address, clean contact form with Name/Email/Message fields.
+   - FOOTER: Business Name, copyright year, tagline.
+6. Hover effects, subtle fade animations, smooth scrolling.`;
 
 function buildUserPrompt(lead) {
-  const phoneLine = lead.phone ? `Phone: ${lead.phone}` : 'Phone: Not available';
-  return `Create a professional website for this business:
+  return `Create a high-converting landing page for:
 
 Business Name: ${lead.name}
 Category/Industry: ${lead.category}
-City/Location: ${lead.city}
-Full Address: ${lead.address}
-${phoneLine}
+City: ${lead.city}
+Address: ${lead.address}
+Phone: ${lead.phone || 'Contact for details'}
 
-Design guidelines:
-- Match the color scheme and tone to the "${lead.category}" industry
-- The hero section should immediately communicate what this business does
-- Write copy that sounds authentic to a local ${lead.category} business in ${lead.city}
-- Make the CTA compelling and industry-appropriate
-- The contact form should be clean and inviting`;
+Make it look like a high-end $2,000 custom website!`;
 }
 
-// ---------------------------------------------------------------------------
-// Core function
-// ---------------------------------------------------------------------------
-
 /**
- * Generate a single-page HTML website for a lead using the OpenAI API.
+ * Generate a single-page HTML website for a lead using Google Gemini API.
  *
- * @param {object} lead - Lead object from leadFinder
- * @returns {Promise<{ html: string, filePath: string }>}
+ * @param {object} lead
+ * @returns {Promise<{ html: string, filePath: string, fileName: string }>}
  */
 export async function generateSite(lead) {
-  requireConfig('OpenAI API');
-  const client = getClient();
+  const model = getGeminiModel();
 
-  console.log(`🎨 Generating website for: ${lead.name} (${lead.category})`);
+  console.log(`🎨 Generating website via Gemini AI for: ${lead.name} (${lead.category})`);
 
-  const response = await client.chat.completions.create({
-    model: config.openaiModel,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserPrompt(lead) },
-    ],
-    temperature: 0.7,
-    max_tokens: 4096,
-  });
+  const prompt = `${SYSTEM_PROMPT}\n\n${buildUserPrompt(lead)}`;
 
-  let html = response.choices[0].message.content.trim();
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  let html = response.text().trim();
 
-  // Clean up: remove markdown code fences if the model added them
-  html = html.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '');
+  // Strip markdown code fences if model outputted them
+  html = html.replace(/^```html?\s*/i, '').replace(/\s*```$/i, '').trim();
 
-  // Ensure it starts with a doctype or html tag
   if (!html.toLowerCase().startsWith('<!doctype') && !html.toLowerCase().startsWith('<html')) {
-    // Try to find the HTML content within the response
     const htmlMatch = html.match(/<!DOCTYPE html>[\s\S]*<\/html>/i) ||
                       html.match(/<html[\s\S]*<\/html>/i);
     if (htmlMatch) {
@@ -104,13 +79,13 @@ export async function generateSite(lead) {
     }
   }
 
-  // Save to file
+  // Save HTML file locally
   await mkdir(config.generatedSitesDir, { recursive: true });
   const fileName = `${lead.slug}.html`;
   const filePath = path.join(config.generatedSitesDir, fileName);
   await writeFile(filePath, html, 'utf-8');
 
-  console.log(`   ✅ Site saved: ${fileName} (${(html.length / 1024).toFixed(1)} KB)`);
+  console.log(`   ✅ Gemini Site generated & saved: ${fileName} (${(html.length / 1024).toFixed(1)} KB)`);
 
   return { html, filePath, fileName };
 }

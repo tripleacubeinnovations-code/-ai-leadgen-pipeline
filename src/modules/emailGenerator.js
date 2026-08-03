@@ -1,134 +1,89 @@
 /**
- * Email Generator Module
- * ----------------------
- * Uses the OpenAI API to generate personalized cold emails and follow-ups,
- * referencing the business by name and linking to their demo site.
+ * Email Generator Module (100% FREE - Google Gemini API)
+ * -----------------------------------------------------
+ * Uses Google Gemini API to generate personalized cold emails and follow-ups.
+ *
+ * REQUIRES NO CREDIT CARD! Free from https://aistudio.google.com/app/apikey
  *
  * Exports:
  *   generateEmail(lead, demoUrl, type) → { subject, textBody, htmlBody }
  */
 
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import config, { requireConfig } from '../config.js';
 
-let openaiClient = null;
+let genAI = null;
 
-function getClient() {
-  if (!openaiClient) {
-    requireConfig('OpenAI API');
-    openaiClient = new OpenAI({ apiKey: config.openaiApiKey });
+function getGeminiModel() {
+  if (!genAI) {
+    requireConfig();
+    genAI = new GoogleGenerativeAI(config.geminiApiKey);
   }
-  return openaiClient;
+  return genAI.getGenerativeModel({ model: config.geminiModel });
 }
 
-// ---------------------------------------------------------------------------
-// Prompt Templates
-// ---------------------------------------------------------------------------
+const SYSTEM_PROMPT = `You are a warm, genuine cold email copywriter. Write a 3-5 sentence personalized outreach email.
 
-const SYSTEM_PROMPT = `You are an expert cold email copywriter for a professional web design agency. You write concise, genuine, high-converting cold emails.
+STRICT JSON OUTPUT REQUIREMENT:
+Return ONLY a valid raw JSON object with keys: "subject", "textBody", "htmlBody".
+Do NOT wrap in markdown \`\`\`json fences.
 
-STRICT RULES:
-1. Output ONLY a JSON object with exactly these keys: "subject", "textBody", "htmlBody"
-2. The email body must be 3-5 sentences. No more.
-3. Sound human, warm, and professional — NOT salesy or spammy.
-4. Reference the business by name naturally.
-5. Include the demo site URL as a clickable link in the HTML body.
-6. End with a soft CTA (question, not a command).
-7. Do NOT include unsubscribe text — that will be added automatically.
-8. The textBody should be plain text (no HTML tags). The htmlBody should be a simple, clean HTML email body (just the content, no full HTML document structure).
-9. The subject line should be short (under 50 characters), personalized, and curiosity-provoking.`;
+Rules:
+1. Warm, professional, human tone (not salesy).
+2. Reference the business name and their city naturally.
+3. Mention you noticed they don't have a website listed on Google, so you built a free live demo site for them.
+4. Include the demo URL naturally in the body.
+5. End with a soft question CTA.`;
 
-function buildInitialEmailPrompt(lead, demoUrl) {
-  return `Write a cold outreach email to this business:
-
-Business Name: ${lead.name}
-Category: ${lead.category}
-City: ${lead.city}
-
-Demo Website URL: ${demoUrl}
-
-Context: We noticed they don't have a website yet. We've built a free demo website for them to show what's possible. The email should:
-- Open with something specific about their business or industry
-- Mention we built a quick demo website for them
-- Include the demo URL
-- Ask if they'd like to chat about making it their official site`;
+function buildPrompt(lead, demoUrl, type) {
+  if (type === 'followup') {
+    return `Write a SHORT 2-sentence follow-up email to ${lead.name} (${lead.category} in ${lead.city}). Remind them about the free demo site built for them at ${demoUrl}. Ask a simple yes/no question if they saw it.`;
+  }
+  return `Write a cold email to ${lead.name} (${lead.category} in ${lead.city}). Demo site URL: ${demoUrl}`;
 }
-
-function buildFollowUpEmailPrompt(lead, demoUrl) {
-  return `Write a SHORT follow-up email (2-3 sentences max) to this business:
-
-Business Name: ${lead.name}
-Category: ${lead.category}
-City: ${lead.city}
-
-Demo Website URL: ${demoUrl}
-
-Context: We sent them an initial email 3 days ago with a free demo website we built for them. They haven't replied yet. This follow-up should:
-- Be very brief and non-pushy
-- Gently remind them about the demo site
-- Include the URL again
-- Ask a simple yes/no question`;
-}
-
-// ---------------------------------------------------------------------------
-// Core function
-// ---------------------------------------------------------------------------
 
 /**
- * Generate a personalized email for a lead.
+ * Generate personalized email using Gemini API.
  *
- * @param {object} lead - Lead object
- * @param {string} demoUrl - The deployed demo site URL
- * @param {'initial'|'followup'} [type='initial'] - Email type
+ * @param {object} lead
+ * @param {string} demoUrl
+ * @param {'initial'|'followup'} [type='initial']
  * @returns {Promise<{ subject: string, textBody: string, htmlBody: string }>}
  */
 export async function generateEmail(lead, demoUrl, type = 'initial') {
-  requireConfig('OpenAI API');
-  const client = getClient();
+  const model = getGeminiModel();
 
-  const typeLabel = type === 'followup' ? 'follow-up' : 'initial';
-  console.log(`✉️  Generating ${typeLabel} email for: ${lead.name}`);
+  console.log(`✉️  Generating ${type} email via Gemini AI for: ${lead.name}`);
 
-  const userPrompt = type === 'followup'
-    ? buildFollowUpEmailPrompt(lead, demoUrl)
-    : buildInitialEmailPrompt(lead, demoUrl);
+  const prompt = `${SYSTEM_PROMPT}\n\n${buildPrompt(lead, demoUrl, type)}`;
 
-  const response = await client.chat.completions.create({
-    model: config.openaiModel,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.8,
-    max_tokens: 1024,
-    response_format: { type: 'json_object' },
-  });
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  let text = response.text().trim();
 
-  let content = response.choices[0].message.content.trim();
+  // Strip markdown code fences if present
+  text = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
 
-  // Parse the JSON response
   let emailData;
   try {
-    emailData = JSON.parse(content);
+    emailData = JSON.parse(text);
   } catch {
-    // Fallback: try to extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       emailData = JSON.parse(jsonMatch[0]);
     } else {
-      throw new Error(`Failed to parse email response as JSON: ${content.slice(0, 200)}`);
+      // Fallback object if raw text returned
+      emailData = {
+        subject: `Free Demo Website for ${lead.name}`,
+        textBody: `Hi ${lead.name},\n\nWe built a free demo website for your business in ${lead.city}: ${demoUrl}\n\nWould you like to take a look?`,
+        htmlBody: `<p>Hi ${lead.name},</p><p>We built a free demo website for your business in ${lead.city}: <a href="${demoUrl}">${demoUrl}</a></p><p>Would you like to take a look?</p>`,
+      };
     }
   }
 
-  // Validate required fields
-  const { subject, textBody, htmlBody } = emailData;
-  if (!subject || !textBody || !htmlBody) {
-    throw new Error(`Email response missing required fields. Got: ${Object.keys(emailData).join(', ')}`);
-  }
+  console.log(`   ✅ Email generated — Subject: "${emailData.subject}"`);
 
-  console.log(`   ✅ Email generated — Subject: "${subject}"`);
-
-  return { subject, textBody, htmlBody };
+  return emailData;
 }
 
 export default { generateEmail };

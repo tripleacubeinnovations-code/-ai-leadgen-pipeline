@@ -1,5 +1,5 @@
 /**
- * Centralized configuration loader.
+ * Centralized configuration loader for the 100% Free / Zero-Card Stack.
  * Reads from .env file and validates all required keys.
  */
 
@@ -12,9 +12,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const PROJECT_ROOT = path.resolve(__dirname, '..');
 
-// ---------------------------------------------------------------------------
-// Helper: read an env var with an optional default
-// ---------------------------------------------------------------------------
 function env(key, defaultValue = undefined) {
   const val = process.env[key];
   if (val !== undefined && val !== '') return val;
@@ -22,36 +19,20 @@ function env(key, defaultValue = undefined) {
   return undefined;
 }
 
-// ---------------------------------------------------------------------------
-// Build the config object
-// ---------------------------------------------------------------------------
 const config = Object.freeze({
-  // Google Places
-  googlePlacesApiKey: env('GOOGLE_PLACES_API_KEY'),
+  // Gemini AI (Free from Google AI Studio)
+  geminiApiKey: env('GEMINI_API_KEY'),
+  geminiModel: env('GEMINI_MODEL', 'gemini-1.5-flash'),
 
-  // OpenAI
-  openaiApiKey: env('OPENAI_API_KEY'),
-  openaiModel: env('OPENAI_MODEL', 'gpt-4o'),
+  // Email (Resend API or Gmail SMTP)
+  resendApiKey: env('RESEND_API_KEY'),
+  gmailUser: env('GMAIL_USER'),
+  gmailAppPassword: env('GMAIL_APP_PASSWORD'),
+  senderEmail: env('SENDER_EMAIL', 'onboarding@resend.dev'),
+  senderName: env('SENDER_NAME', 'Lead Gen Automation'),
 
   // Vercel
   vercelToken: env('VERCEL_TOKEN'),
-  vercelTeamId: env('VERCEL_TEAM_ID', ''),
-
-  // Mailgun
-  mailgunApiKey: env('MAILGUN_API_KEY'),
-  mailgunDomain: env('MAILGUN_DOMAIN'),
-  mailgunRegion: env('MAILGUN_REGION', 'us'),
-
-  // Email
-  senderEmail: env('SENDER_EMAIL', 'hello@yourdomain.com'),
-  senderName: env('SENDER_NAME', 'Lead Gen Bot'),
-
-  // Google Sheets
-  googleSheetsId: env('GOOGLE_SHEETS_ID'),
-  googleServiceAccountKeyFile: env(
-    'GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
-    path.join(PROJECT_ROOT, 'credentials', 'service-account.json')
-  ),
 
   // Follow-up
   followUpDelayDays: parseInt(env('FOLLOW_UP_DELAY_DAYS', '3'), 10),
@@ -67,64 +48,36 @@ const config = Object.freeze({
   projectRoot: PROJECT_ROOT,
 });
 
-// ---------------------------------------------------------------------------
-// Validation: check which keys are present / missing
-// ---------------------------------------------------------------------------
 const REQUIRED_KEYS = {
-  'Google Places API': 'googlePlacesApiKey',
-  'OpenAI API':        'openaiApiKey',
-  'Vercel Token':      'vercelToken',
-  'Mailgun API':       'mailgunApiKey',
-  'Mailgun Domain':    'mailgunDomain',
-  'Google Sheets ID':  'googleSheetsId',
+  'Gemini AI API Key': 'geminiApiKey',
+  'Email Provider (Resend API Key or Gmail User)': (cfg) => !!(cfg.resendApiKey || (cfg.gmailUser && cfg.gmailAppPassword)),
+  'Vercel Token': 'vercelToken',
 };
 
-/**
- * Validate configuration and return a report.
- * @returns {{ valid: boolean, missing: string[], present: string[] }}
- */
 export function validateConfig() {
   const missing = [];
   const present = [];
 
-  for (const [label, key] of Object.entries(REQUIRED_KEYS)) {
-    if (config[key]) {
-      present.push(label);
-    } else {
-      missing.push(label);
-    }
-  }
+  if (config.geminiApiKey) present.push('Gemini AI API Key (Google AI Studio)');
+  else missing.push('Gemini AI API Key (from https://aistudio.google.com/app/apikey)');
 
-  // Check service account file existence
-  if (config.googleSheetsId && !existsSync(config.googleServiceAccountKeyFile)) {
-    missing.push('Google Service Account Key File (not found at path)');
-  }
+  if (config.resendApiKey) present.push('Email Provider: Resend API');
+  else if (config.gmailUser && config.gmailAppPassword) present.push('Email Provider: Gmail SMTP');
+  else missing.push('Email Provider (Resend API Key OR Gmail App Password)');
+
+  if (config.vercelToken) present.push('Vercel Token');
+  else missing.push('Vercel Token (from https://vercel.com/account/tokens)');
 
   return { valid: missing.length === 0, missing, present };
 }
 
-/**
- * Validate config and throw if any required keys are missing.
- * @param {string[]} [requiredFor] - Subset of keys needed for a specific module
- */
 export function requireConfig(...requiredFor) {
-  const keysToCheck = requiredFor.length > 0
-    ? requiredFor
-    : Object.keys(REQUIRED_KEYS);
-
-  const missingLabels = [];
-  for (const label of keysToCheck) {
-    const key = REQUIRED_KEYS[label];
-    if (key && !config[key]) {
-      missingLabels.push(label);
-    }
-  }
-
-  if (missingLabels.length > 0) {
+  const { valid, missing } = validateConfig();
+  if (!valid) {
     throw new Error(
-      `Missing required configuration:\n` +
-      missingLabels.map(l => `  • ${l}`).join('\n') +
-      `\n\nSet these in your .env file. See .env.example for reference.`
+      `Missing required configuration for Zero-Card Stack:\n` +
+      missing.map(m => `  • ${m}`).join('\n') +
+      `\n\nCopy .env.example to .env and paste your free keys.`
     );
   }
 }

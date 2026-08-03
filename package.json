@@ -1,7 +1,7 @@
 {
   "name": "ai-leadgen-pipeline",
-  "version": "1.0.0",
-  "description": "AI-powered lead generation automation pipeline — discover businesses without websites, generate demo sites, deploy, and run cold email outreach.",
+  "version": "1.1.0",
+  "description": "100% FREE AI-powered lead generation automation pipeline — discovers businesses without websites using OpenStreetMap, generates demo sites & cold emails using Google Gemini API, deploys to Vercel, and sends emails via Resend or Gmail SMTP.",
   "type": "module",
   "main": "src/cli.js",
   "bin": {
@@ -18,15 +18,15 @@
     "check-config": "node src/cli.js check-config"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
-    "form-data": "^4.0.0",
     "googleapis": "^140.0.1",
-    "mailgun.js": "^10.2.3",
     "node-cron": "^3.0.3",
-    "openai": "^4.56.0",
-    "ora": "^8.0.1"
+    "nodemailer": "^6.9.14",
+    "ora": "^8.0.1",
+    "resend": "^3.5.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -36,7 +36,8 @@
     "cold-email",
     "automation",
     "ai",
-    "pipeline"
+    "gemini",
+    "free"
   ],
   "license": "UNLICENSED",
   "private": true

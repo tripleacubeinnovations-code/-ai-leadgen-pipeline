@@ -1,47 +1,45 @@
 /**
- * Email Sender Module
- * -------------------
- * Sends emails via the Mailgun API using the official mailgun.js SDK.
- * Supports dry-run mode for testing.
+ * Email Sender Module (100% FREE - Resend API or Gmail SMTP)
+ * ---------------------------------------------------------
+ * Sends emails using Resend (100% free, 3,000 emails/mo, NO credit card)
+ * OR Nodemailer Gmail SMTP (100% free, 500 emails/day, NO credit card).
  *
  * Exports:
  *   sendEmail(to, subject, htmlBody, textBody, options) → { status, messageId }
  */
 
-import Mailgun from 'mailgun.js';
-import FormData from 'form-data';
-import config, { requireConfig } from '../config.js';
+import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
+import config from '../config.js';
 
-let mgClient = null;
+let resendClient = null;
+let nodemailerTransporter = null;
 
-function getClient() {
-  if (!mgClient) {
-    requireConfig('Mailgun API', 'Mailgun Domain');
-    const mailgun = new Mailgun(FormData);
-    mgClient = mailgun.client({
-      username: 'api',
-      key: config.mailgunApiKey,
-      url: config.mailgunRegion === 'eu'
-        ? 'https://api.eu.mailgun.net'
-        : 'https://api.mailgun.net',
-    });
+function getResendClient() {
+  if (!resendClient && config.resendApiKey) {
+    resendClient = new Resend(config.resendApiKey);
   }
-  return mgClient;
+  return resendClient;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+function getNodemailerTransporter() {
+  if (!nodemailerTransporter && config.gmailUser && config.gmailAppPassword) {
+    nodemailerTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: config.gmailUser,
+        pass: config.gmailAppPassword,
+      },
+    });
+  }
+  return nodemailerTransporter;
+}
 
-/**
- * Wrap email body with a minimal HTML template and unsubscribe footer.
- */
-function wrapHtmlBody(htmlBody, unsubscribeUrl) {
+function wrapHtmlBody(htmlBody) {
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
     a { color: #2563eb; }
@@ -51,34 +49,20 @@ function wrapHtmlBody(htmlBody, unsubscribeUrl) {
 <body>
   ${htmlBody}
   <div class="footer">
-    <p>Sent by ${config.senderName} · <a href="${unsubscribeUrl || '#'}">Unsubscribe</a></p>
+    <p>Sent by ${config.senderName} · Reply "unsubscribe" to opt out.</p>
   </div>
 </body>
 </html>`;
 }
 
 /**
- * Add unsubscribe text to plain text body.
- */
-function wrapTextBody(textBody) {
-  return `${textBody}\n\n---\nSent by ${config.senderName} · Reply "unsubscribe" to opt out.`;
-}
-
-// ---------------------------------------------------------------------------
-// Core function
-// ---------------------------------------------------------------------------
-
-/**
- * Send an email via Mailgun.
+ * Send email via Resend or Gmail SMTP.
  *
- * @param {string} to - Recipient email address
- * @param {string} subject - Email subject line
- * @param {string} htmlBody - HTML email body (inner content, will be wrapped)
- * @param {string} textBody - Plain text fallback body
+ * @param {string} to
+ * @param {string} subject
+ * @param {string} htmlBody
+ * @param {string} textBody
  * @param {object} [options]
- * @param {boolean} [options.dryRun] - Override global dry-run setting
- * @param {string}  [options.replyTo] - Reply-to address
- * @param {object}  [options.tags] - Mailgun tags for tracking
  * @returns {Promise<{ status: string, messageId: string|null }>}
  */
 export async function sendEmail(to, subject, htmlBody, textBody, options = {}) {
@@ -87,43 +71,57 @@ export async function sendEmail(to, subject, htmlBody, textBody, options = {}) {
   if (isDryRun) {
     console.log(`   📧 [DRY RUN] Would send email to: ${to}`);
     console.log(`   📧 Subject: "${subject}"`);
-    console.log(`   📧 Body preview: ${textBody.slice(0, 120)}...`);
+    console.log(`   📧 Body preview: ${textBody.slice(0, 100)}...`);
     return { status: 'dry-run', messageId: null };
   }
 
-  requireConfig('Mailgun API', 'Mailgun Domain');
-  const client = getClient();
-
   const fullHtml = wrapHtmlBody(htmlBody);
-  const fullText = wrapTextBody(textBody);
 
-  const messageData = {
-    from: `${config.senderName} <${config.senderEmail}>`,
-    to: [to],
-    subject,
-    text: fullText,
-    html: fullHtml,
-  };
+  // Method 1: Try Resend API (Free, No Card)
+  const resend = getResendClient();
+  if (resend) {
+    try {
+      const data = await resend.emails.send({
+        from: `${config.senderName} <${config.senderEmail}>`,
+        to: [to],
+        subject,
+        html: fullHtml,
+        text: textBody,
+      });
 
-  // Add optional reply-to
-  if (options.replyTo) {
-    messageData['h:Reply-To'] = options.replyTo;
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      console.log(`   ✅ Email sent via Resend to ${to} — ID: ${data.data?.id}`);
+      return { status: 'sent', messageId: data.data?.id };
+    } catch (err) {
+      console.warn(`   ⚠️ Resend API warning: ${err.message}. Trying Gmail SMTP...`);
+    }
   }
 
-  // Add tags for tracking
-  if (options.tags) {
-    messageData['o:tag'] = Array.isArray(options.tags) ? options.tags : [options.tags];
+  // Method 2: Try Gmail SMTP (Free, No Card)
+  const transporter = getNodemailerTransporter();
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: `"${config.senderName}" <${config.gmailUser}>`,
+        to,
+        subject,
+        html: fullHtml,
+        text: textBody,
+      });
+
+      console.log(`   ✅ Email sent via Gmail SMTP to ${to} — ID: ${info.messageId}`);
+      return { status: 'sent', messageId: info.messageId };
+    } catch (err) {
+      console.error(`   ❌ Gmail SMTP failed: ${err.message}`);
+      return { status: 'failed', messageId: null, error: err.message };
+    }
   }
 
-  try {
-    const response = await client.messages.create(config.mailgunDomain, messageData);
-
-    console.log(`   ✅ Email sent to ${to} — ID: ${response.id}`);
-    return { status: 'sent', messageId: response.id };
-  } catch (err) {
-    console.error(`   ❌ Failed to send email to ${to}: ${err.message}`);
-    return { status: 'failed', messageId: null, error: err.message };
-  }
+  console.log(`   ⚠️ No email keys configured in .env — email logged to console only.`);
+  return { status: 'no-provider', messageId: null };
 }
 
 export default { sendEmail };
