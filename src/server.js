@@ -284,6 +284,15 @@ async function handleRequest(req, res) {
 export function startServer(port = PORT) {
   const server = http.createServer(handleRequest);
 
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️  Port ${port} is already in use. Trying port ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      console.error(`❌ Server error: ${err.message}`);
+    }
+  });
+
   server.listen(port, () => {
     console.log('\n');
     console.log('╔══════════════════════════════════════════════════════════════╗');
