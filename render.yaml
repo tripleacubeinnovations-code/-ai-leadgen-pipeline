@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-leadgen-dashboard
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run dashboard
+    envVars:
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
+      - key: SENDER_EMAIL
+        value: onboarding@resend.dev
+      - key: SENDER_NAME
+        value: TripleACube Innovations

@@ -293,12 +293,12 @@ export function startServer(port = PORT) {
     }
   });
 
-  server.listen(port, () => {
+  server.listen(port, '0.0.0.0', () => {
     console.log('\n');
     console.log('╔══════════════════════════════════════════════════════════════╗');
     console.log('║           📊  AI LEAD-GEN DASHBOARD RUNNING                ║');
     console.log('╚══════════════════════════════════════════════════════════════╝');
-    console.log(`\n  👉 Open in browser: http://localhost:${port}\n`);
+    console.log(`\n  👉 Server listening on port ${port}\n`);
   });
 
   return server;
