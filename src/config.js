@@ -22,7 +22,7 @@ function env(key, defaultValue = undefined) {
 const config = Object.freeze({
   // Gemini AI (Free from Google AI Studio)
   geminiApiKey: env('GEMINI_API_KEY'),
-  geminiModel: env('GEMINI_MODEL', 'gemini-1.5-flash'),
+  geminiModel: env('GEMINI_MODEL', 'gemini-2.0-flash'),
 
   // Email (Resend API or Gmail SMTP)
   resendApiKey: env('RESEND_API_KEY'),
@@ -47,12 +47,6 @@ const config = Object.freeze({
   dataDir: path.join(PROJECT_ROOT, 'data'),
   projectRoot: PROJECT_ROOT,
 });
-
-const REQUIRED_KEYS = {
-  'Gemini AI API Key': 'geminiApiKey',
-  'Email Provider (Resend API Key or Gmail User)': (cfg) => !!(cfg.resendApiKey || (cfg.gmailUser && cfg.gmailAppPassword)),
-  'Vercel Token': 'vercelToken',
-};
 
 export function validateConfig() {
   const missing = [];
